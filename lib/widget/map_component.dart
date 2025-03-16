@@ -2,21 +2,18 @@ import 'dart:async';
 import 'dart:math' show Random;
 import 'dart:ui';
 
-import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart' show Colors, KeyEvent, KeyEventResult;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_90tank/data/constants.dart';
 import 'package:flutter_90tank/data/game_state.dart';
 import 'package:flutter_90tank/data/land_mass_type.dart' show LandMassType;
-import 'package:flutter_90tank/data/obstacle_info.dart';
 import 'package:flutter_90tank/data/role_type.dart' show RoleType;
 import 'package:flutter_90tank/data/stage_level.dart';
 import 'package:flutter_90tank/event/enemy_tank_destroy_event.dart';
 import 'package:flutter_90tank/event/hero_tank_destroy_event.dart'
     show HeroTankDestroyEvent;
 import 'package:flutter_90tank/tank_game.dart';
-import 'package:flutter_90tank/utils/canvas_utils.dart';
 import 'package:flutter_90tank/widget/map_tiled_component.dart';
 import 'package:flutter_90tank/widget/tank_component.dart';
 
@@ -69,6 +66,8 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
       } else if (event is HeroTankDestroyEvent) {
         if (heroTankLifeCount > 1) {
           --heroTankLifeCount;
+          _heroTankComponent?.removeFromParent();
+          _generateHeroTank(); //添加玩家坦克
         } else {
           heroTankLifeCount = 0;
           isHomeAlive = false; // 总部被消灭
@@ -76,6 +75,12 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
       }
     }); // 订阅消息事件
     _addMapObstacles(); // 添加地图障碍物
+    _generateHeroTank(); //添加玩家坦克
+    _generateEnemyTanks(); // 生成敌方坦克
+  }
+
+  /// 添加玩家坦克
+  void _generateHeroTank() {
     add(
       _heroTankComponent = HeroTankComponent(
         position: Vector2(
@@ -84,7 +89,6 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
         ),
       ),
     );
-    _generateEnemyTanks(); // 生成敌方坦克
   }
 
   /// 生成敌方坦克
@@ -123,6 +127,12 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
     super.render(canvas);
     // _drawMapTiles(canvas); // 绘制战场地图地块
     _drawHomeTile(canvas, isAlive: true); // 绘制总部地块
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    _generateEnemyTanks(); // 生成敌方坦克
   }
 
   /// 添加地图障碍物

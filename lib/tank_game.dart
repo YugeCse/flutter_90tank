@@ -31,7 +31,7 @@ class TankGame extends FlameGame with KeyboardEvents, HasCollisionDetection {
   StageScene? _stageScene;
 
   /// 游戏坦克战斗场景
-  TankWarScene? _tankWarScene;
+  TankWarScene? tankWarScene;
 
   late TextComponent sizeTextComponent;
 
@@ -57,7 +57,7 @@ class TankGame extends FlameGame with KeyboardEvents, HasCollisionDetection {
     super.onLoad();
     resImage = await images.load(Constants.resourceImagePath);
     add(
-      _tankWarScene = TankWarScene(
+      tankWarScene = TankWarScene(
         stage: 3,
         position:
             TankWarScene.warGroundOffset +
@@ -78,7 +78,7 @@ class TankGame extends FlameGame with KeyboardEvents, HasCollisionDetection {
   void onGameResize(Vector2 size) {
     super.onGameResize(size);
     _menuScene?.position = size / 2.0 - Constants.screenSize / 2.0;
-    _tankWarScene?.position = size / 2.0 - Constants.screenSize / 2.0;
+    tankWarScene?.position = size / 2.0 - Constants.screenSize / 2.0;
   }
 
   /// 显示菜单
@@ -120,12 +120,12 @@ class TankGame extends FlameGame with KeyboardEvents, HasCollisionDetection {
       _stageScene?.removeFromParent();
       _stageScene = null;
     }
-    if (_tankWarScene != null) {
-      _tankWarScene?.removeFromParent();
-      _tankWarScene = null;
+    if (tankWarScene != null) {
+      tankWarScene?.removeFromParent();
+      tankWarScene = null;
     }
     add(
-      _tankWarScene = TankWarScene(
+      tankWarScene = TankWarScene(
         size: Constants.screenSize,
         position: size / 2.0 - Constants.screenSize / 2.0,
       ),
@@ -149,9 +149,11 @@ class TankGame extends FlameGame with KeyboardEvents, HasCollisionDetection {
     } else if (state == GameState.init) {
       return _stageScene?.onKeyEvent(event, keysPressed) ??
           super.onKeyEvent(event, keysPressed);
-    } else if (state == GameState.start) {
+    } else if (state == GameState.start ||
+        state == GameState.over ||
+        state == GameState.win) {
       debugPrint('keysPressed: $keysPressed');
-      return _tankWarScene?.handleKeyEvent(event, keysPressed) ??
+      return tankWarScene?.handleKeyEvent(event, keysPressed) ??
           super.onKeyEvent(event, keysPressed);
     }
     return super.onKeyEvent(event, keysPressed);

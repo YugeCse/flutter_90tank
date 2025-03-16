@@ -56,9 +56,6 @@ abstract class TankComponent extends SpriteComponent with HasGameRef<TankGame> {
   /// 坦克移动方向
   Vector2 direction;
 
-  /// 是否被打死
-  bool isDead = false;
-
   /// 当前born的标识
   int _currentBornTag = 0;
 
@@ -264,10 +261,8 @@ class EnemyTankComponent extends TankComponent with RoleDetectorMixin {
 
   @override
   void hurt() {
-    if (numOfHitsReceived > 1) {
-      numOfHitsReceived--;
-    } else {
-      isDead = true;
+    if (--numOfHitsReceived == 0) {
+      hitBox.collisionType = CollisionType.inactive;
       parent?.remove(this); //生命值为1时，移除坦克
       SoundEffect.playTankDestoryAudio(); //播放坦克销毁音效
       gameRef.sendMsgEvent(EnemyTankDestroyEvent());
@@ -366,33 +361,21 @@ class HeroTankComponent extends TankComponent
   }
 
   @override
-  void onCollisionStart(
-    Set<Vector2> intersectionPoints,
-    PositionComponent other,
-  ) {
-    super.onCollisionStart(intersectionPoints, other);
-    if (other is EnemyTankComponent || other is MapTiledComponent) {
-      // debugPrint('玩家坦克与障碍物碰撞 $other');
-    }
-    // debugPrint('玩家坦克与障碍物碰撞 $other');
-  }
-
-  @override
   void hurt() {
     if (numOfHitsReceived > 1) {
       numOfHitsReceived--; //坦克被击中，但未死亡
     } else {
-      life = (life - 1 == 0) ? 0 : life - 1;
-      isDead = true;
-      if (life <= 0) {
-        sprite?.srcPosition = Constants.tankBombImagePosition; //播放爆炸动画
-        add(
-          OpacityEffect.to(0.0, LinearEffectController(1))
-            ..onComplete = removeFromParent,
-        );
-        SoundEffect.playTankDestoryAudio(); //播放爆炸音效
-      }
-      gameRef.sendMsgEvent(HeroTankDestroyEvent());
+      --life; //坦克被击中，生命值减少
+      hitBox.collisionType = CollisionType.inactive;
+      sprite?.srcPosition = Constants.tankBombImagePosition; //播放爆炸动画
+      add(
+        OpacityEffect.to(0.0, LinearEffectController(1))
+          ..onComplete = () {
+            removeFromParent();
+            gameRef.sendMsgEvent(HeroTankDestroyEvent());
+          },
+      );
+      SoundEffect.playTankDestoryAudio(); //播放爆炸音效
     }
   }
 

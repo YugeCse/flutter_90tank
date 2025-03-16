@@ -40,8 +40,7 @@ class MapTiledComponent extends SpriteComponent with HasGameRef<TankGame> {
     size = MapComponent.warTileSize;
     priority = landMassType.layerLevel;
     if (landMassType == LandMassType.grass ||
-        landMassType == LandMassType.ice ||
-        landMassType == LandMassType.river) {
+        landMassType == LandMassType.ice) {
       return;
     }
     add(hitbox = RectangleHitbox(size: size, isSolid: true)..debugMode = false);

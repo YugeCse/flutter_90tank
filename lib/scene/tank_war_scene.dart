@@ -5,10 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_90tank/tank_game.dart' show TankGame;
 import 'package:flutter_90tank/utils/sound_effect.dart';
+import 'package:flutter_90tank/widget/data_component.dart';
 import 'package:flutter_90tank/widget/map_component.dart';
 
 /// 坦克大战场景
 class TankWarScene extends PositionComponent with HasGameRef<TankGame> {
+  /// 战场的偏移量
+  static final Vector2 warGroundOffset = Vector2(32, 16);
+
+  /// 战场的大小
+  static final Vector2 warGroundSize = Vector2(416, 416);
+
   ///构造函数
   TankWarScene({this.stage = 0, super.position, super.size});
 
@@ -18,11 +25,8 @@ class TankWarScene extends PositionComponent with HasGameRef<TankGame> {
   /// 游戏地图组件
   late MapComponent mapComponent;
 
-  /// 战场的偏移量
-  static final Vector2 warGroundOffset = Vector2(32, 16);
-
-  /// 战场的大小
-  static final Vector2 warGroundSize = Vector2(416, 416);
+  /// 游戏数据组件
+  late DataComponent dataComponent;
 
   @override
   FutureOr<void> onLoad() async {
@@ -31,7 +35,17 @@ class TankWarScene extends PositionComponent with HasGameRef<TankGame> {
       mapComponent = MapComponent(
         stage: stage,
         size: warGroundSize,
-        position: warGroundOffset,
+        position: Vector2.all(warGroundOffset.y),
+      ),
+    );
+    add(
+      dataComponent = DataComponent(
+        position: Vector2(
+          mapComponent.position.x +
+              mapComponent.size.x +
+              MapComponent.warTileSize.x / 4,
+          warGroundOffset.y,
+        ),
       ),
     );
     SoundEffect.playStartGameAudio(); //播放开始游戏音频

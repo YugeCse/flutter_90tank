@@ -7,9 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_90tank/data/constants.dart';
 import 'package:flutter_90tank/data/land_mass_type.dart' show LandMassType;
 import 'package:flutter_90tank/data/move_direction.dart';
-import 'package:flutter_90tank/data/obstacle_info.dart' show ObstacleInfo;
 import 'package:flutter_90tank/data/role_type.dart';
-import 'package:flutter_90tank/scene/tank_war_scene.dart';
 import 'package:flutter_90tank/tank_game.dart';
 import 'package:flutter_90tank/utils/sound_effect.dart';
 import 'package:flutter_90tank/widget/map_component.dart';
@@ -91,13 +89,14 @@ class BulletComponent extends SpriteComponent
     if (other is TankComponent) {
       if ((ownerType == typeOfEnemy && other is HeroTankComponent) ||
           (ownerType == typeOfPlayer && other is EnemyTankComponent)) {
-        other.hurt();
         _bulletBomb(); // 子弹发生爆炸
+        other.hurt(); // 子弹发生爆炸
       }
     } else if (other is MapTiledComponent) {
-      _bulletBomb(); // 子弹发生爆炸
-      other.hurt(); // 地图砖块发生爆炸
-      if (other.landMassType == LandMassType.wall) {}
+      if (other.landMassType != LandMassType.river) {
+        _bulletBomb(); // 子弹发生爆炸
+        other.hurt(); // 地图砖块发生爆炸
+      }
     }
     super.onCollisionStart(intersectionPoints, other);
   }
