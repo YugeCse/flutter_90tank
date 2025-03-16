@@ -1,0 +1,1 @@
+enum TankState { normal, dead }

@@ -1,0 +1,1 @@
+enum BoomType { tank, bullet }
