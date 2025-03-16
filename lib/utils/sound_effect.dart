@@ -8,8 +8,8 @@ class SoundEffect {
 
   /// Play a sound effect
   static FutureOr<AudioPlayer?> playSound({required String name}) {
-    return null;
-    // return FlameAudio.play(name);
+    // return null;
+    return FlameAudio.play(name);
   }
 
   static void playStartGameAudio() => playSound(name: 'start.mp3');
