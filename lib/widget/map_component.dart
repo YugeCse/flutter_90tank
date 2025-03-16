@@ -1,18 +1,23 @@
 import 'dart:async';
+import 'dart:math' show Random;
 import 'dart:ui';
 
+import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart' show Colors, KeyEvent, KeyEventResult;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_90tank/data/constants.dart';
+import 'package:flutter_90tank/data/game_state.dart';
 import 'package:flutter_90tank/data/land_mass_type.dart' show LandMassType;
 import 'package:flutter_90tank/data/obstacle_info.dart';
 import 'package:flutter_90tank/data/role_type.dart' show RoleType;
 import 'package:flutter_90tank/data/stage_level.dart';
+import 'package:flutter_90tank/event/enemy_tank_destroy_event.dart';
+import 'package:flutter_90tank/event/hero_tank_destroy_event.dart'
+    show HeroTankDestroyEvent;
 import 'package:flutter_90tank/tank_game.dart';
 import 'package:flutter_90tank/utils/canvas_utils.dart';
-import 'package:flutter_90tank/widget/role_detector_mixin.dart';
+import 'package:flutter_90tank/widget/map_tiled_component.dart';
 import 'package:flutter_90tank/widget/tank_component.dart';
 
 /// 地图组件，负责绘制战场地图
@@ -38,11 +43,14 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
   /// 关卡地图数据
   final List<List<int>> stageData;
 
-  /// 障碍物信息
-  late List<ObstacleInfo> obstacles;
-
   /// 总部是否还存在
   bool isHomeAlive = false;
+
+  /// 玩家坦克生命数
+  int heroTankLifeCount = 3;
+
+  /// 敌方被消灭的坦克数量
+  int destroyEnemyTankCount = 0;
 
   /// 绘制玩家坦克
   HeroTankComponent? _heroTankComponent;
@@ -50,7 +58,24 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
   @override
   FutureOr<void> onLoad() async {
     super.onLoad();
-    obstacles = getObstacles(); // 获取障碍物信息
+    gameRef.subscribeMsgEvent((event) {
+      if (event is EnemyTankDestroyEvent) {
+        ++destroyEnemyTankCount; // 敌方坦克被消灭
+        if (destroyEnemyTankCount < Constants.maxFightingEnemyCount) {
+          _generateEnemyTanks(); // 生成敌方坦克
+        } else {
+          gameRef.state = GameState.win; // 游戏胜利
+        }
+      } else if (event is HeroTankDestroyEvent) {
+        if (heroTankLifeCount > 1) {
+          --heroTankLifeCount;
+        } else {
+          heroTankLifeCount = 0;
+          isHomeAlive = false; // 总部被消灭
+        }
+      }
+    }); // 订阅消息事件
+    _addMapObstacles(); // 添加地图障碍物
     add(
       _heroTankComponent = HeroTankComponent(
         position: Vector2(
@@ -59,21 +84,36 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
         ),
       ),
     );
-    add(
-      EnemyTankComponent.create(
-        position: Vector2(0, 0),
-        numOfHitsReceived: 1,
-        enemyImagePosition: Constants.enemy2ImagePosition,
-      ),
-    );
-    add(
-      EnemyTankComponent.create(
-        position: Vector2(size.x - warTileSize.x * 2, 0),
-        speed: 50,
-        numOfHitsReceived: 1,
-        enemyImagePosition: Constants.enemy1ImagePosition,
-      ),
-    );
+    _generateEnemyTanks(); // 生成敌方坦克
+  }
+
+  /// 生成敌方坦克
+  void _generateEnemyTanks() {
+    var enemyTankCount = children.whereType<EnemyTankComponent>().length;
+    var diffCount = Constants.maxFightingEnemyCount - enemyTankCount;
+    if (diffCount <= 0) return;
+    var random = Random();
+    for (var i = 0; i < diffCount; i++) {
+      var bornPosition =
+          random.nextDouble() >= 0.5
+              ? Vector2(0, 0)
+              : Vector2(size.x - warTileSize.x * 2, 0);
+      var randValue = random.nextDouble();
+      var enemyImagePosition =
+          randValue < 0.5
+              ? Constants.enemy1ImagePosition
+              : (randValue < 0.75
+                  ? Constants.enemy2ImagePosition
+                  : Constants.enemy3ImagePosition);
+      add(
+        EnemyTankComponent.create(
+          speed: random.nextInt(50) + 60,
+          position: bornPosition,
+          numOfHitsReceived: 1,
+          enemyImagePosition: enemyImagePosition,
+        ),
+      );
+    }
   }
 
   @override
@@ -81,13 +121,12 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
     var paint = Paint()..color = Colors.black;
     canvas.drawRect(size.toRect(), paint);
     super.render(canvas);
-    _drawMapTiles(canvas); // 绘制战场地图地块
+    // _drawMapTiles(canvas); // 绘制战场地图地块
     _drawHomeTile(canvas, isAlive: true); // 绘制总部地块
   }
 
-  /// 获取障碍物的信息
-  List<ObstacleInfo> getObstacles() {
-    List<ObstacleInfo> obstacles = [];
+  /// 添加地图障碍物
+  void _addMapObstacles() {
     for (var y = 0; y < warTileCount; y++) {
       for (var x = 0; x < warTileCount; x++) {
         var tileData = stageData[y][x];
@@ -98,27 +137,32 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
           LandMassType.grid,
           LandMassType.river,
           LandMassType.ice,
+          LandMassType.grass,
         ].contains(landMassType)) {
-          obstacles.add(ObstacleInfo(x, y, warTileSize, landMassType));
+          add(
+            MapTiledComponent(
+              landMassType: landMassType,
+              position: Vector2(x * warTileSize.x, y * warTileSize.y),
+            ),
+          );
         }
       }
     }
-    return obstacles;
   }
 
-  /// 绘制战场地图地块
-  void _drawMapTiles(Canvas canvas) {
-    for (var i = 0; i < obstacles.length; i++) {
-      var obstacle = obstacles[i];
-      canvas.drawMapTile(
-        column: obstacle.tileX,
-        row: obstacle.tileY,
-        tileSize: warTileSize,
-        type: obstacle.type,
-        resImage: gameRef.resImage,
-      );
-    }
-  }
+  // /// 绘制战场地图地块
+  // void _drawMapTiles(Canvas canvas) {
+  //   for (var i = 0; i < obstacles.length; i++) {
+  //     var obstacle = obstacles[i];
+  //     canvas.drawMapTile(
+  //       column: obstacle.tileX,
+  //       row: obstacle.tileY,
+  //       tileSize: warTileSize,
+  //       type: obstacle.type,
+  //       resImage: gameRef.resImage,
+  //     );
+  //   }
+  // }
 
   /// 绘制总部地块
   /// - [isAlive] 是否存活，默认：true
@@ -161,15 +205,6 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
     );
     return (result.isNotEmpty, result.toList());
   }
-
-  /// 获取障碍物矩形列表
-  List<Rect> get allObstacleRects =>
-      obstacles
-          .where(
-            (e) => e.type != LandMassType.grass || e.type != LandMassType.ice,
-          )
-          .map((e) => e.rect)
-          .toList();
 
   /// 处理玩家按键事件
   KeyEventResult handleKeyEvent(

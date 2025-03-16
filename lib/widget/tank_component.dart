@@ -1,21 +1,26 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
+import 'package:flame/effects.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show KeyDownEvent, KeyUpEvent, LogicalKeyboardKey;
 import 'package:flutter_90tank/data/constants.dart';
-import 'package:flutter_90tank/data/land_mass_type.dart';
 import 'package:flutter_90tank/data/move_direction.dart' show MoveDirection;
 import 'package:flutter_90tank/data/role_type.dart';
 import 'package:flutter_90tank/data/tank_state.dart';
+import 'package:flutter_90tank/event/enemy_tank_destroy_event.dart';
+import 'package:flutter_90tank/event/hero_tank_destroy_event.dart'
+    show HeroTankDestroyEvent;
 import 'package:flutter_90tank/scene/tank_war_scene.dart';
 import 'package:flutter_90tank/tank_game.dart' show TankGame;
 import 'package:flutter_90tank/utils/sound_effect.dart';
 import 'package:flutter_90tank/widget/bullet_component.dart'
     show BulletComponent;
 import 'package:flutter_90tank/widget/map_component.dart';
+import 'package:flutter_90tank/widget/map_tiled_component.dart';
 import 'package:flutter_90tank/widget/role_detector_mixin.dart';
 
 abstract class TankComponent extends SpriteComponent with HasGameRef<TankGame> {
@@ -29,6 +34,7 @@ abstract class TankComponent extends SpriteComponent with HasGameRef<TankGame> {
     this.speed = 100,
     Vector2? initialDirection,
   }) : direction = initialDirection ?? MoveDirection.up {
+    priority = 1;
     size = MapComponent.warTileSize * 2;
   }
 
@@ -59,6 +65,15 @@ abstract class TankComponent extends SpriteComponent with HasGameRef<TankGame> {
   /// 当前born的标识改变时间
   int _bornTagChangeTime = 0;
 
+  /// 坦克的碰撞矩形组件
+  late RectangleHitbox hitBox;
+
+  @override
+  FutureOr<void> onLoad() async {
+    super.onLoad();
+    add(hitBox = RectangleHitbox(isSolid: true)..debugMode = false); // 坦克碰撞检测
+  }
+
   /// 受伤
   void hurt();
 
@@ -84,12 +99,12 @@ abstract class TankComponent extends SpriteComponent with HasGameRef<TankGame> {
     } else if (direction == MoveDirection.left) {
       bulletPosition = Vector2(
         position.x,
-        position.y + size.y / 2 - bulletSize.y / 5,
+        position.y + size.y / 2 - bulletSize.y / 2,
       );
     } else if (direction == MoveDirection.right) {
       bulletPosition = Vector2(
         position.x + size.x,
-        position.y + size.y / 2 - bulletSize.y / 5,
+        position.y + size.y / 2 - bulletSize.y / 2,
       );
     }
     mapComponent.add(
@@ -139,19 +154,40 @@ abstract class TankComponent extends SpriteComponent with HasGameRef<TankGame> {
   /// 判断坦克矩形是否与任何障碍物重叠
   /// - [tankRect] 矩形
   /// - [rectOwner] 矩形拥有者
-  bool isNextTimeMoveCollideWithAnyObstacle({
-    required Rect tankRect,
-    required RoleDetectorMixin rectOwner,
-  }) {
+  bool isCollisionWithObstacles({required RectangleHitbox hitbox}) {
     if (parent == null || parent is! MapComponent) return false;
-    return (parent as MapComponent).obstacles.any(
+    var mapComponent = parent as MapComponent;
+    return mapComponent.children
+        .whereType<MapTiledComponent>()
+        .where(
+          (el) =>
+              (el.hitbox?.parent as PositionComponent?)?.toRect().overlaps(
+                hitbox.toRect().deflate(2.0),
+              ) ??
+              false,
+        )
+        .isNotEmpty;
+  }
+
+  /// 判断坦克矩形是否与任何其他坦克重叠
+  bool isCollisionWithOtherTanks({required RectangleHitbox hitbox}) {
+    if (parent == null || parent is! MapComponent) return false;
+    var mapComponent = parent as MapComponent;
+    if (this is HeroTankComponent) {
+      return mapComponent.children.whereType<EnemyTankComponent>().any(
+        (el) =>
+            (el.hitBox.parent as PositionComponent?)?.toRect().overlaps(
+              hitbox.toRect().deflate(2.0),
+            ) ??
+            false,
+      );
+    }
+    return mapComponent.children.whereType<HeroTankComponent>().any(
       (el) =>
-          ![
-            // LandMassType.river,
-            LandMassType.ice,
-            LandMassType.grass,
-          ].contains(el.type) &&
-          el.isOverlaps(tankRect),
+          (el.hitBox.parent as PositionComponent?)?.toRect().overlaps(
+            hitbox.toRect().deflate(2.0),
+          ) ??
+          false,
     );
   }
 }
@@ -234,6 +270,7 @@ class EnemyTankComponent extends TankComponent with RoleDetectorMixin {
       isDead = true;
       parent?.remove(this); //生命值为1时，移除坦克
       SoundEffect.playTankDestoryAudio(); //播放坦克销毁音效
+      gameRef.sendMsgEvent(EnemyTankDestroyEvent());
     }
   }
 
@@ -253,29 +290,21 @@ class EnemyTankComponent extends TankComponent with RoleDetectorMixin {
     }
     var tmpPosition = position + direction * speed * dt;
     tmpPosition.clamp(Vector2.zero(), TankWarScene.warGroundSize - size);
-    if (parent != null && parent is MapComponent) {
-      var mapComponent = parent as MapComponent;
-      var tankRect = tmpPosition.toPositionedRect(size);
-      if (isNextTimeMoveCollideWithAnyObstacle(
-        rectOwner: this,
-        tankRect: tankRect,
-      )) {
-        debugPrint('敌机坦克发生了碰撞');
-        return;
-      }
-      if (mapComponent
-          .isCollideWithAnyTank(rect: tankRect, rectOfRole: RoleType.enemyTank)
-          .$1) {
-        debugPrint('---->敌人坦克与玩家坦克发生了碰撞');
-        return;
-      }
-      position = tmpPosition; //未发生碰撞时，更新坦克位置
-      curTimeMillis = DateTime.now().millisecondsSinceEpoch;
-      if (Random().nextDouble() > 0.5 &&
-          curTimeMillis - _fireFrameTime > fireLimitTime) {
-        _fireFrameTime = curTimeMillis;
-        fire(ownerType: BulletComponent.typeOfEnemy); //随机开火
-      }
+    var tmpHitBox = RectangleHitbox(
+      isSolid: true,
+      size: size,
+      position: tmpPosition,
+    );
+    if (isCollisionWithObstacles(hitbox: tmpHitBox) ||
+        isCollisionWithOtherTanks(hitbox: tmpHitBox)) {
+      return; //发生碰撞时，不更新坦克位置
+    }
+    position = tmpPosition; //未发生碰撞时，更新坦克位置
+    curTimeMillis = DateTime.now().millisecondsSinceEpoch;
+    if (Random().nextDouble() > 0.5 &&
+        curTimeMillis - _fireFrameTime > fireLimitTime) {
+      _fireFrameTime = curTimeMillis;
+      fire(ownerType: BulletComponent.typeOfEnemy); //随机开火
     }
   }
 
@@ -300,11 +329,12 @@ class EnemyTankComponent extends TankComponent with RoleDetectorMixin {
   }
 }
 
-class HeroTankComponent extends TankComponent with RoleDetectorMixin {
+class HeroTankComponent extends TankComponent
+    with RoleDetectorMixin, CollisionCallbacks {
   HeroTankComponent({
     super.position,
     super.size,
-    super.life = 3,
+    super.life = 1,
     super.invincible = true,
     super.numOfHitsReceived = 1,
     super.speed = 80,
@@ -336,14 +366,33 @@ class HeroTankComponent extends TankComponent with RoleDetectorMixin {
   }
 
   @override
+  void onCollisionStart(
+    Set<Vector2> intersectionPoints,
+    PositionComponent other,
+  ) {
+    super.onCollisionStart(intersectionPoints, other);
+    if (other is EnemyTankComponent || other is MapTiledComponent) {
+      // debugPrint('玩家坦克与障碍物碰撞 $other');
+    }
+    // debugPrint('玩家坦克与障碍物碰撞 $other');
+  }
+
+  @override
   void hurt() {
-    if (numOfHitsReceived <= 1) {
-      life = (life - 1 == 0) ? 0 : life - 1;
-      if (life <= 0) {
-        ///TODO GameOver
-      }
-    } else {
+    if (numOfHitsReceived > 1) {
       numOfHitsReceived--; //坦克被击中，但未死亡
+    } else {
+      life = (life - 1 == 0) ? 0 : life - 1;
+      isDead = true;
+      if (life <= 0) {
+        sprite?.srcPosition = Constants.tankBombImagePosition; //播放爆炸动画
+        add(
+          OpacityEffect.to(0.0, LinearEffectController(1))
+            ..onComplete = removeFromParent,
+        );
+        SoundEffect.playTankDestoryAudio(); //播放爆炸音效
+      }
+      gameRef.sendMsgEvent(HeroTankDestroyEvent());
     }
   }
 
@@ -351,23 +400,6 @@ class HeroTankComponent extends TankComponent with RoleDetectorMixin {
   void update(double dt) {
     super.update(dt);
     _updateMoveByKeyboard(dt); //更新玩家移动逻辑
-  }
-
-  /// 更新玩家开火逻辑
-  void _updateFire() {
-    var curTimeMills = DateTime.now().millisecondsSinceEpoch;
-    if (curTimeMills - _fireFrameTime <= fireLimitTime) {
-      debugPrint('玩家坦克开火间隔时间未到');
-      return;
-    }
-    _fireFrameTime = curTimeMills;
-    if (_keysPressed.intersection({
-      LogicalKeyboardKey.keyJ,
-      LogicalKeyboardKey.keyK,
-      LogicalKeyboardKey.space,
-    }).isNotEmpty) {
-      fire(ownerType: BulletComponent.typeOfPlayer);
-    }
   }
 
   /// 通过键盘更新玩家移动逻辑
@@ -399,33 +431,23 @@ class HeroTankComponent extends TankComponent with RoleDetectorMixin {
   void _updateMove(Vector2 direction, double dt) {
     this.direction = direction;
     _updateSpriteByDirection(direction);
-    var tmpPosition = (position + direction * speed * dt).clone();
+    var tmpPosition = position.clone() + direction * speed * dt;
+    var tmpHitbox = RectangleHitbox(
+      size: size,
+      isSolid: true,
+      position: tmpPosition,
+    );
     tmpPosition.clamp(Vector2.zero(), TankWarScene.warGroundSize - size);
-    if (parent is MapComponent) {
-      var mapComponent = parent as MapComponent;
-      var tankRect = tmpPosition.toPositionedRect(size).deflate(1.0);
-      if (isNextTimeMoveCollideWithAnyObstacle(
-        rectOwner: this,
-        tankRect: tankRect,
-      )) {
-        debugPrint('---->玩家与障碍物发生了碰撞');
-        return;
-      }
-      if (mapComponent
-          .isCollideWithAnyTank(rect: tankRect, rectOfRole: RoleType.heroTank)
-          .$1) {
-        debugPrint('---->玩家与其他坦克发生了碰撞');
-        return;
-      }
+    if (isCollisionWithObstacles(hitbox: tmpHitbox) ||
+        isCollisionWithOtherTanks(hitbox: tmpHitbox)) {
+      return;
     }
-    // this.direction = direction; //没有碰撞才能更新坦克方向
     position = tmpPosition; //没有碰撞才能更新坦克位置
   }
 
   /// 根据坦克方向更新坦克图片
   void _updateSpriteByDirection(Vector2 direction) {
     var imgPosition = Constants.playerImagePosition.clone();
-    debugPrint('direction: $direction imagePosition: $imgPosition');
     if (direction == MoveDirection.down) {
       imgPosition.x = MapComponent.warTileSize.x * 2;
     } else if (direction == MoveDirection.left) {
@@ -433,8 +455,24 @@ class HeroTankComponent extends TankComponent with RoleDetectorMixin {
     } else if (direction == MoveDirection.right) {
       imgPosition.x = MapComponent.warTileSize.x * 2 * 3;
     }
-    debugPrint('direction: $direction imagePosition: $imgPosition');
     sprite = Sprite(gameRef.resImage, srcSize: size, srcPosition: imgPosition);
+  }
+
+  /// 更新玩家开火逻辑
+  void _updateFire() {
+    var curTimeMills = DateTime.now().millisecondsSinceEpoch;
+    if (curTimeMills - _fireFrameTime <= fireLimitTime) {
+      debugPrint('玩家坦克开火间隔时间未到');
+      return;
+    }
+    _fireFrameTime = curTimeMills;
+    if (_keysPressed.intersection({
+      LogicalKeyboardKey.keyJ,
+      LogicalKeyboardKey.keyK,
+      LogicalKeyboardKey.space,
+    }).isNotEmpty) {
+      fire(ownerType: BulletComponent.typeOfPlayer);
+    }
   }
 
   /// 处理玩家按键事件

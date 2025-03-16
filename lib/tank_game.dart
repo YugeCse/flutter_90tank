@@ -9,11 +9,12 @@ import 'package:flutter/material.dart' show Canvas, KeyEvent, KeyEventResult;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_90tank/data/constants.dart';
 import 'package:flutter_90tank/data/game_state.dart';
+import 'package:flutter_90tank/event/base_event.dart';
 import 'package:flutter_90tank/scene/menu_scene.dart';
 import 'package:flutter_90tank/scene/stage_scene.dart';
 import 'package:flutter_90tank/scene/tank_war_scene.dart';
 
-class TankGame extends FlameGame with KeyboardEvents {
+class TankGame extends FlameGame with KeyboardEvents, HasCollisionDetection {
   /// 游戏状态
   GameState state = GameState.start;
 
@@ -34,13 +35,30 @@ class TankGame extends FlameGame with KeyboardEvents {
 
   late TextComponent sizeTextComponent;
 
+  /// 事件消息控制对象
+  final StreamController<BaseEvent> eventMsgController =
+      StreamController<BaseEvent>.broadcast();
+
+  /// 发送消息事件
+  void sendMsgEvent<T extends BaseEvent>(T event) =>
+      eventMsgController.sink.add(event);
+
+  /// 订阅消息事件
+  StreamSubscription<BaseEvent> subscribeMsgEvent<T extends BaseEvent>(
+    void Function(T event) callback,
+  ) {
+    return eventMsgController.stream.listen((event) {
+      if (event is T) callback(event);
+    });
+  }
+
   @override
   FutureOr<void> onLoad() async {
     super.onLoad();
     resImage = await images.load(Constants.resourceImagePath);
     add(
       _tankWarScene = TankWarScene(
-        stage: 21,
+        stage: 3,
         position:
             TankWarScene.warGroundOffset +
             Vector2(0, size.y / 2.0 - TankWarScene.warGroundSize.y / 2.0),

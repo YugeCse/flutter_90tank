@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flame_audio/flame_audio.dart';
 
+/// This class is used to play sound effects
 class SoundEffect {
   SoundEffect._();
 
   /// Play a sound effect
-  static Future<AudioPlayer> playSound({required String name}) =>
-      FlameAudio.play(name);
+  static FutureOr<AudioPlayer?> playSound({required String name}) {
+    return null;
+    // return FlameAudio.play(name);
+  }
 
   static void playStartGameAudio() => playSound(name: 'start.mp3');
 

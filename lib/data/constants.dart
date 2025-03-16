@@ -69,4 +69,16 @@ class Constants {
 
   /// 道具的图片坐标
   static final propImagePosition = Vector2(256, 110);
+
+  /*************************************
+   *                                   *
+   *        定义游戏中的常量              *
+   *                                   *
+   *************************************/
+
+  /// 战斗中最大敌人数： 20
+  static const maxWarEnemyCount = 20;
+
+  /// 参与战斗的最多的敌人数： 5
+  static const maxFightingEnemyCount = 5;
 }
