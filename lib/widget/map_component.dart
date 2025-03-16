@@ -26,19 +26,16 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
   static final Vector2 warTileSize = Vector2.all(16);
 
   /// 构造方法
-  MapComponent({super.size, super.position, this.stage = 0})
-    : stageData =
-          StageLevel.maps[stage < 0
-              ? 0
-              : (stage > StageLevel.maps.length - 1
-                  ? StageLevel.maps.length - 1
-                  : stage)];
+  MapComponent({super.size, super.position, this.stage = 0});
+
+  /// 是否允许开始游戏
+  bool allowPlay = false;
 
   /// 关卡等级
-  final int stage;
+  int stage;
 
   /// 关卡地图数据
-  final List<List<int>> stageData;
+  List<List<int>> stageData = [];
 
   /// 总部是否还存在
   bool isHomeAlive = false;
@@ -51,6 +48,15 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
 
   /// 绘制玩家坦克
   HeroTankComponent? _heroTankComponent;
+
+  /// 开始游戏
+  void startGame() {
+    stageData = StageLevel.maps[stage > StageLevel.maps.length - 1 ? 0 : stage];
+    _addMapObstacles(); // 添加地图障碍物
+    _generateHeroTank(); //添加玩家坦克
+    _generateEnemyTanks(); // 生成敌方坦克
+    allowPlay = true; // 允许开始游戏
+  }
 
   @override
   FutureOr<void> onLoad() async {
@@ -74,9 +80,6 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
         }
       }
     }); // 订阅消息事件
-    _addMapObstacles(); // 添加地图障碍物
-    _generateHeroTank(); //添加玩家坦克
-    _generateEnemyTanks(); // 生成敌方坦克
   }
 
   /// 添加玩家坦克
@@ -132,11 +135,12 @@ class MapComponent extends PositionComponent with HasGameRef<TankGame> {
   @override
   void update(double dt) {
     super.update(dt);
-    _generateEnemyTanks(); // 生成敌方坦克
+    if (allowPlay) _generateEnemyTanks(); // 生成敌方坦克
   }
 
   /// 添加地图障碍物
   void _addMapObstacles() {
+    if (stageData.isEmpty) return;
     for (var y = 0; y < warTileCount; y++) {
       for (var x = 0; x < warTileCount; x++) {
         var tileData = stageData[y][x];

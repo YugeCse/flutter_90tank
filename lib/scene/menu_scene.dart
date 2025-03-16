@@ -75,7 +75,7 @@ class MenuScene extends PositionComponent
     canvas.clipRect(size.toRect());
   }
 
-  KeyEventResult onKeyEvent(
+  KeyEventResult handleKeyEvent(
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {
@@ -102,7 +102,7 @@ class MenuScene extends PositionComponent
       LogicalKeyboardKey.enter,
       LogicalKeyboardKey.space,
     }).isNotEmpty) {
-      gameRef.onPrepareGame();
+      gameRef.onStartGame();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;

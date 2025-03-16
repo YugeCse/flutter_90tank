@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter_90tank/scene/stage_scene.dart' show StageScene;
 import 'package:flutter_90tank/tank_game.dart' show TankGame;
 import 'package:flutter_90tank/utils/sound_effect.dart';
 import 'package:flutter_90tank/widget/data_component.dart';
@@ -21,6 +22,9 @@ class TankWarScene extends PositionComponent with HasGameRef<TankGame> {
 
   /// 游戏关卡
   final int stage;
+
+  /// 关卡场景
+  StageScene? _stageScene;
 
   /// 游戏地图组件
   late MapComponent mapComponent;
@@ -48,6 +52,18 @@ class TankWarScene extends PositionComponent with HasGameRef<TankGame> {
         ),
       ),
     );
+    add(
+      _stageScene =
+          StageScene(size: size)
+            ..onStartGame = mapComponent.startGame
+            ..onStartGameFinished = () {
+              if (_stageScene != null) {
+                _stageScene?.removeFromParent();
+                _stageScene = null;
+              }
+            }
+            ..debugMode = true,
+    ); // 添加关卡场景
     SoundEffect.playStartGameAudio(); //播放开始游戏音频
   }
 
@@ -62,5 +78,10 @@ class TankWarScene extends PositionComponent with HasGameRef<TankGame> {
   KeyEventResult handleKeyEvent(
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
-  ) => mapComponent.handleKeyEvent(event, keysPressed);
+  ) {
+    if (_stageScene != null) {
+      return _stageScene!.handleKeyEvent(event, keysPressed);
+    }
+    return mapComponent.handleKeyEvent(event, keysPressed);
+  }
 }

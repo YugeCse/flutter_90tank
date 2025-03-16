@@ -18,6 +18,10 @@ class StageScene extends PositionComponent with HasGameRef<TankGame> {
 
   late RectangleComponent _rightRectangleComponent;
 
+  void Function()? onStartGame;
+
+  void Function()? onStartGameFinished;
+
   @override
   FutureOr<void> onLoad() async {
     super.onLoad();
@@ -29,14 +33,14 @@ class StageScene extends PositionComponent with HasGameRef<TankGame> {
     );
     add(
       _leftRectangleComponent = RectangleComponent(
-        size: Vector2(size.x / 2, size.y),
+        size: Vector2(size.x, size.y / 2),
         paint: Paint()..color = Colors.grey,
       ),
     );
     add(
       _rightRectangleComponent = RectangleComponent(
-        size: Vector2(size.x / 2, size.y),
-        position: Vector2(size.x / 2, 0),
+        size: Vector2(size.x, size.y / 2),
+        position: Vector2(0, size.y / 2),
         paint: Paint()..color = Colors.grey,
       ),
     );
@@ -70,19 +74,17 @@ class StageScene extends PositionComponent with HasGameRef<TankGame> {
       _stageTimerComponent = null;
     }
     debugPrint('enter play scene');
-    // _stageTextComponent.add(
-    //   ColorEffect(Colors.white, LinearEffectController(3)),
-    // );
+    onStartGame?.call();
     _leftRectangleComponent.add(
-      MoveEffect.to(Vector2(-size.x / 2.0, 0), LinearEffectController(3)),
+      MoveEffect.to(Vector2(0, -size.y / 2), LinearEffectController(3)),
     );
     _rightRectangleComponent.add(
-      MoveEffect.to(Vector2(size.x, 0), LinearEffectController(3))
-        ..onComplete = gameRef.onStartGame,
+      MoveEffect.to(Vector2(0, size.y), LinearEffectController(3))
+        ..onComplete = onStartGameFinished,
     );
   }
 
-  KeyEventResult onKeyEvent(
+  KeyEventResult handleKeyEvent(
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {

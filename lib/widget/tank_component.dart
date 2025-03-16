@@ -159,7 +159,7 @@ abstract class TankComponent extends SpriteComponent with HasGameRef<TankGame> {
         .where(
           (el) =>
               (el.hitbox?.parent as PositionComponent?)?.toRect().overlaps(
-                hitbox.toRect().deflate(2.0),
+                hitbox.toRect().deflate(0.2),
               ) ??
               false,
         )
@@ -174,7 +174,7 @@ abstract class TankComponent extends SpriteComponent with HasGameRef<TankGame> {
       return mapComponent.children.whereType<EnemyTankComponent>().any(
         (el) =>
             (el.hitBox.parent as PositionComponent?)?.toRect().overlaps(
-              hitbox.toRect().deflate(2.0),
+              hitbox.toRect().deflate(0.2),
             ) ??
             false,
       );
@@ -182,7 +182,7 @@ abstract class TankComponent extends SpriteComponent with HasGameRef<TankGame> {
     return mapComponent.children.whereType<HeroTankComponent>().any(
       (el) =>
           (el.hitBox.parent as PositionComponent?)?.toRect().overlaps(
-            hitbox.toRect().deflate(2.0),
+            hitbox.toRect().deflate(0.2),
           ) ??
           false,
     );
